@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Telegram MiniApp - Vị trí liên tục</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 30px 10px;
+            background-color: #f9f9f9;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 1.2em;
+            color: #555;
+        }
+
+        #location {
+            margin-top: 20px;
+            font-size: 1.4em;
+            color: #222;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>📍 Telegram MiniApp: Định vị 5 giây/lần</h1>
+    <div id="status">⏳ Đang khởi động...</div>
+    <div id="location">Chưa có dữ liệu.</div>
+
+    <script>
+        // Kiểm tra nếu đang chạy trong Telegram Mini App
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready(); // báo Telegram biết app đã sẵn sàng
+            Telegram.WebApp.expand(); // mở rộng full-screen nếu có thể
+        }
+
+        const status = document.getElementById("status");
+        const locationDiv = document.getElementById("location");
+
+        function getLocation() {
+            if ("geolocation" in navigator) {
+                status.innerText = "🔄 Đang lấy vị trí...";
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                status.innerText = "⚠️ Trình duyệt không hỗ trợ định vị.";
+            }
+        }
+
+        function showPosition(position) {
+            const lat = position.coords.latitude.toFixed(6);
+            const lon = position.coords.longitude.toFixed(6);
+            const timestamp = new Date().toLocaleTimeString();
+            status.innerText = `✅ Đã cập nhật lúc ${timestamp}`;
+            locationDiv.innerHTML = `
+        <p>📌 Vĩ độ: ${lat}</p>
+        <p>📌 Kinh độ: ${lon}</p>
+      `;
+        }
+
+        function showError(error) {
+            let message = "❌ Không thể lấy vị trí.";
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "🚫 Bạn đã từ chối chia sẻ vị trí.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "❌ Vị trí không khả dụng.";
+                    break;
+                case error.TIMEOUT:
+                    message = "⌛ Quá thời gian lấy vị trí.";
+                    break;
+            }
+            status.innerText = message;
+        }
+
+        // Bắt đầu ngay và cập nhật mỗi 5 giây
+        getLocation();
+        setInterval(getLocation, 5000);
+    </script>
+</body>
+
+</html>
