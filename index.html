@@ -2,100 +2,109 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Telegram MiniApp - Yêu cầu quyền định vị</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telegram MiniApp - Định vị</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 30px 10px;
-      background-color: #f2f2f2;
+      margin: 0;
+      background-color: #f0f0f0;
     }
     h1 {
       color: #333;
+      font-size: 24px;
     }
     #status {
       margin-top: 10px;
-      font-size: 1.2em;
-      color: #555;
+      font-size: 1.1em;
+      color: #666;
     }
     #location {
       margin-top: 20px;
-      font-size: 1.4em;
+      font-size: 1.3em;
       color: #222;
       background: #fff;
       padding: 20px;
-      border-radius: 10px;
+      border-radius: 12px;
       display: inline-block;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      box-shadow: 0 0 10px rgba(0,0,0,0.08);
+      min-width: 260px;
     }
   </style>
 </head>
 <body>
 
-  <h1>📍 Yêu cầu quyền truy cập vị trí</h1>
-  <div id="status">⏳ Đang yêu cầu quyền truy cập vị trí...</div>
-  <div id="location">Chưa có dữ liệu.</div>
+  <h1>📍 Vị trí hiện tại của bạn</h1>
+  <div id="status">⏳ Đang khởi động Telegram WebApp...</div>
+  <div id="location">Chưa có dữ liệu vị trí.</div>
 
   <script>
-    // Bắt Telegram WebApp
-    if (window.Telegram && window.Telegram.WebApp) {
-      Telegram.WebApp.ready();
-      Telegram.WebApp.expand();
-    }
-
     const status = document.getElementById("status");
     const locationDiv = document.getElementById("location");
 
-    function getLocation() {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude.toFixed(6);
-            const lon = position.coords.longitude.toFixed(6);
-            const time = new Date().toLocaleTimeString();
-
-            status.innerText = `✅ Vị trí lấy lúc ${time}`;
-            locationDiv.innerHTML = `
-              <p>📌 Vĩ độ: ${lat}</p>
-              <p>📌 Kinh độ: ${lon}</p>
-            `;
-          },
-          (error) => {
-            let message = "";
-            switch (error.code) {
-              case error.PERMISSION_DENIED:
-                message = "🚫 Bạn từ chối quyền truy cập vị trí.";
-                break;
-              case error.POSITION_UNAVAILABLE:
-                message = "❌ Không thể xác định vị trí.";
-                break;
-              case error.TIMEOUT:
-                message = "⌛ Quá thời gian lấy vị trí.";
-                break;
-              default:
-                message = "⚠️ Lỗi không xác định.";
-            }
-            status.innerText = message;
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          }
-        );
+    // ✅ Kiểm tra và khởi động Telegram WebApp
+    function initTelegram() {
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+        status.innerText = "✅ Telegram MiniApp đã sẵn sàng!";
       } else {
-        status.innerText = "⚠️ Trình duyệt không hỗ trợ định vị.";
+        status.innerText = "⚠️ Không phát hiện Telegram WebApp.";
       }
     }
 
-    // Yêu cầu vị trí mỗi khi web mở
-    window.addEventListener("load", () => {
-      getLocation();
+    // ✅ Lấy vị trí mỗi 5 giây
+    function getLocation() {
+      if (!("geolocation" in navigator)) {
+        status.innerText = "⚠️ Trình duyệt không hỗ trợ định vị.";
+        return;
+      }
 
-      // Tùy chọn: lặp lại mỗi 5s
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude.toFixed(6);
+          const lon = position.coords.longitude.toFixed(6);
+          const time = new Date().toLocaleTimeString();
+
+          status.innerText = `📦 Dữ liệu cập nhật lúc ${time}`;
+          locationDiv.innerHTML = `
+            <p>📌 Vĩ độ: ${lat}</p>
+            <p>📌 Kinh độ: ${lon}</p>
+          `;
+        },
+        (error) => {
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              status.innerText = "🚫 Bạn từ chối quyền định vị.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              status.innerText = "❌ Không xác định được vị trí.";
+              break;
+            case error.TIMEOUT:
+              status.innerText = "⌛ Hết thời gian lấy vị trí.";
+              break;
+            default:
+              status.innerText = "⚠️ Lỗi không xác định.";
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    // ✅ Khởi động app và lấy vị trí mỗi 5 giây
+    window.addEventListener("load", () => {
+      initTelegram();
+      getLocation();
       setInterval(getLocation, 5000);
     });
   </script>
+
 </body>
 </html>
