@@ -1,85 +1,101 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Lấy vị trí liên tục</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding-top: 40px;
-      background-color: #f9f9f9;
-    }
-    h1 {
-      color: #333;
-    }
-    #status {
-      margin-top: 10px;
-      font-size: 1.2em;
-      color: #555;
-    }
-    #location {
-      margin-top: 20px;
-      font-size: 1.4em;
-      color: #222;
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      display: inline-block;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Định Vị Telegram</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f2f5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        #location-info {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
 </head>
+
 <body>
+    <div class="container">
+        <h1>Vị Trí Hiện Tại</h1>
+        <div id="location-info">
+            <p>Vĩ độ: <span id="latitude">Đang tải...</span></p>
+            <p>Kinh độ: <span id="longitude">Đang tải...</span></p>
+            <p>Độ chính xác: <span id="accuracy">Đang tải...</span></p>
+            <p>Cập nhật lúc: <span id="timestamp">Đang tải...</span></p>
+        </div>
+    </div>
 
-  <h1>📍 Định vị liên tục mỗi 5 giây</h1>
-  <div id="status">⏳ Đang khởi động...</div>
-  <div id="location">Chưa có dữ liệu.</div>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
 
-  <script>
-    const status = document.getElementById("status");
-    const locationDiv = document.getElementById("location");
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                showError("Trình duyệt không hỗ trợ định vị");
+            }
+        }
 
-    function getLocation() {
-      if ("geolocation" in navigator) {
-        status.innerText = "🔄 Đang lấy vị trí...";
-        navigator.geolocation.getCurrentPosition(showPosition, showError);
-      } else {
-        status.innerText = "⚠️ Trình duyệt không hỗ trợ định vị.";
-      }
-    }
+        function showPosition(position) {
+            document.getElementById("latitude").textContent = position.coords.latitude;
+            document.getElementById("longitude").textContent = position.coords.longitude;
+            document.getElementById("accuracy").textContent = `${position.coords.accuracy} mét`;
+            document.getElementById("timestamp").textContent = new Date().toLocaleString();
 
-    function showPosition(position) {
-      const lat = position.coords.latitude.toFixed(6);
-      const lon = position.coords.longitude.toFixed(6);
-      const timestamp = new Date().toLocaleTimeString();
-      status.innerText = `✅ Vị trí cập nhật lúc ${timestamp}`;
-      locationDiv.innerHTML = `
-        <p>📌 Vĩ độ: ${lat}</p>
-        <p>📌 Kinh độ: ${lon}</p>
-      `;
-    }
+            // Gửi dữ liệu vị trí đến Telegram WebApp
+            tg.sendData(JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: new Date().toISOString()
+            }));
+        }
 
-    function showError(error) {
-      let message = "❌ Không thể lấy vị trí.";
-      switch (error.code) {
-        case error.PERMISSION_DENIED:
-          message = "🚫 Bạn đã từ chối chia sẻ vị trí.";
-          break;
-        case error.POSITION_UNAVAILABLE:
-          message = "❌ Vị trí không khả dụng.";
-          break;
-        case error.TIMEOUT:
-          message = "⌛ Quá thời gian lấy vị trí.";
-          break;
-      }
-      status.innerText = message;
-    }
+        function showError(error) {
+            let errorMessage = "";
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = "Người dùng từ chối cấp quyền truy cập vị trí.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = "Không thể lấy thông tin vị trí.";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = "Yêu cầu vị trí đã hết thời gian chờ.";
+                    break;
+                default:
+                    errorMessage = "Đã xảy ra lỗi không xác định.";
+            }
+            document.getElementById("location-info").innerHTML = `<p class="error">${errorMessage}</p>`;
+        }
 
-    // Bắt đầu ngay và lặp lại mỗi 5 giây
-    getLocation(); // gọi ngay khi load
-    setInterval(getLocation, 5000); // gọi lại mỗi 5 giây
-  </script>
-
+        // Cập nhật vị trí mỗi 5 giây
+        getLocation();
+        setInterval(getLocation, 5000);
+    </script>
 </body>
+
 </html>
