@@ -1,101 +1,281 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Định Vị Telegram</title>
+    <meta name="theme-color" content="#0088cc">
+    <title>Theo Dõi Vị Trí</title>
     <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-button-color: #0088cc;
+            --tg-theme-button-text-color: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            line-height: 1.6;
+            padding: 16px;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
         .container {
-            max-width: 600px;
-            margin: 0 auto;
+            background-color: rgba(0, 136, 204, 0.1);
+            border-radius: 12px;
             padding: 20px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
-        #location-info {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
         }
 
-        .error {
-            color: red;
-            margin-top: 10px;
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background-color: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-error {
+            background-color: #f44336;
+        }
+
+        .location-card {
+            background-color: var(--tg-theme-bg-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .location-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .info-item {
+            padding: 8px;
+        }
+
+        .info-label {
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.6);
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .error-message {
+            color: #f44336;
+            text-align: center;
+            padding: 16px;
+            background-color: rgba(244, 67, 54, 0.1);
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+            }
         }
     </style>
 </head>
-
 <body>
     <div class="container">
-        <h1>Vị Trí Hiện Tại</h1>
-        <div id="location-info">
-            <p>Vĩ độ: <span id="latitude">Đang tải...</span></p>
-            <p>Kinh độ: <span id="longitude">Đang tải...</span></p>
-            <p>Độ chính xác: <span id="accuracy">Đang tải...</span></p>
-            <p>Cập nhật lúc: <span id="timestamp">Đang tải...</span></p>
+        <div class="header">
+            <h1>Theo Dõi Vị Trí</h1>
+            <p>
+                <span id="status-indicator" class="status-indicator"></span>
+                <span id="status-text">Đang khởi tạo...</span>
+            </p>
+        </div>
+
+        <div class="location-card">
+            <div class="location-info">
+                <div class="info-item">
+                    <div class="info-label">Vĩ độ</div>
+                    <div class="info-value" id="latitude">--</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Kinh độ</div>
+                    <div class="info-value" id="longitude">--</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Độ chính xác</div>
+                    <div class="info-value" id="accuracy">--</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Cập nhật lúc</div>
+                    <div class="info-value" id="timestamp">--</div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
+        class LocationTracker {
+            constructor() {
+                this.tg = window.Telegram.WebApp;
+                this.locationManager = this.tg.LocationManager;
+                this.isTracking = false;
+                this.trackingInterval = null;
+                this.updateInterval = 5000; // 5 giây
 
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(showPosition, showError);
-            } else {
-                showError("Trình duyệt không hỗ trợ định vị");
+                this.elements = {
+                    statusIndicator: document.getElementById('status-indicator'),
+                    statusText: document.getElementById('status-text'),
+                    latitude: document.getElementById('latitude'),
+                    longitude: document.getElementById('longitude'),
+                    accuracy: document.getElementById('accuracy'),
+                    timestamp: document.getElementById('timestamp')
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.tg.expand();
+                this.startTracking();
+            }
+
+            startTracking() {
+                if (!navigator.geolocation) {
+                    this.showError('Trình duyệt không hỗ trợ định vị');
+                    return;
+                }
+
+                this.isTracking = true;
+                this.updateStatus('active', 'Đang theo dõi vị trí');
+                this.updateLocation();
+                
+                this.trackingInterval = setInterval(() => {
+                    this.updateLocation();
+                }, this.updateInterval);
+            }
+
+            updateLocation() {
+                navigator.geolocation.getCurrentPosition(
+                    position => this.handleSuccess(position),
+                    error => this.handleError(error),
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            }
+
+            handleSuccess(position) {
+                const { latitude, longitude, accuracy } = position.coords;
+                const timestamp = new Date().toLocaleString('vi-VN');
+
+                this.updateUI({
+                    latitude: latitude.toFixed(6),
+                    longitude: longitude.toFixed(6),
+                    accuracy: `${Math.round(accuracy)} mét`,
+                    timestamp
+                });
+
+                this.sendToTelegram({
+                    latitude,
+                    longitude,
+                    accuracy,
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            updateUI(data) {
+                this.elements.latitude.textContent = data.latitude;
+                this.elements.longitude.textContent = data.longitude;
+                this.elements.accuracy.textContent = data.accuracy;
+                this.elements.timestamp.textContent = data.timestamp;
+            }
+
+            sendToTelegram(data) {
+                try {
+                    this.tg.sendData(JSON.stringify(data));
+                } catch (error) {
+                    console.error('Lỗi khi gửi dữ liệu đến Telegram:', error);
+                }
+            }
+
+            handleError(error) {
+                let message;
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        message = 'Vui lòng cấp quyền truy cập vị trí';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        message = 'Không thể xác định vị trí';
+                        break;
+                    case error.TIMEOUT:
+                        message = 'Hết thời gian yêu cầu vị trí';
+                        break;
+                    default:
+                        message = 'Đã xảy ra lỗi không xác định';
+                }
+                this.showError(message);
+            }
+
+            showError(message) {
+                this.updateStatus('error', message);
+                this.updateUI({
+                    latitude: '--',
+                    longitude: '--',
+                    accuracy: '--',
+                    timestamp: '--'
+                });
+            }
+
+            updateStatus(type, message) {
+                this.elements.statusIndicator.className = `status-indicator status-${type}`;
+                this.elements.statusText.textContent = message;
             }
         }
 
-        function showPosition(position) {
-            document.getElementById("latitude").textContent = position.coords.latitude;
-            document.getElementById("longitude").textContent = position.coords.longitude;
-            document.getElementById("accuracy").textContent = `${position.coords.accuracy} mét`;
-            document.getElementById("timestamp").textContent = new Date().toLocaleString();
-
-            // Gửi dữ liệu vị trí đến Telegram WebApp
-            tg.sendData(JSON.stringify({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy,
-                timestamp: new Date().toISOString()
-            }));
-        }
-
-        function showError(error) {
-            let errorMessage = "";
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMessage = "Người dùng từ chối cấp quyền truy cập vị trí.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMessage = "Không thể lấy thông tin vị trí.";
-                    break;
-                case error.TIMEOUT:
-                    errorMessage = "Yêu cầu vị trí đã hết thời gian chờ.";
-                    break;
-                default:
-                    errorMessage = "Đã xảy ra lỗi không xác định.";
-            }
-            document.getElementById("location-info").innerHTML = `<p class="error">${errorMessage}</p>`;
-        }
-
-        // Cập nhật vị trí mỗi 5 giây
-        getLocation();
-        setInterval(getLocation, 5000);
+        // Khởi tạo ứng dụng
+        document.addEventListener('DOMContentLoaded', () => {
+            new LocationTracker();
+        });
     </script>
 </body>
-
 </html>
