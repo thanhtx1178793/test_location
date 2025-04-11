@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Mini App - Get Location</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Geolocation in Telegram Mini App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,119 +13,146 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-        }
-        #location {
-            font-size: 18px;
-            margin-top: 20px;
+            background-color: #f0f0f0;
         }
         button {
             padding: 10px 20px;
             font-size: 16px;
-            background-color: var(--tg-theme-button-color, #8774e1);
-            color: var(--tg-theme-button-text-color, #ffffff);
+            background-color: #0088cc;
+            color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            margin: 10px;
+        }
+        button:hover {
+            background-color: #006b9f;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <h1>Telegram Mini App - Location Tracker</h1>
-    <button id="startBtn">Bắt đầu lấy vị trí</button>
-    <button id="stopBtn">Dừng</button>
-    <div id="location">Vị trí: Chưa có dữ liệu</div>
+    <button id="geoButton">📍 Allow Geolocation Access</button>
+    <div id="status">Click the button to share your location.</div>
 
     <script>
-        // Khởi tạo Telegram Web App
-        const tg = window.Telegram.WebApp;
-        tg.ready(); // Báo hiệu Mini App đã sẵn sàng
+        // Initialize Telegram WebApp
+        const WebApp = window.Telegram.WebApp;
+        WebApp.ready();
 
-        // Biến để lưu trữ interval ID
-        let intervalId = null;
+        // Get DOM elements
+        const geoButton = document.getElementById('geoButton');
+        const statusDiv = document.getElementById('status');
 
-        // Hàm hiển thị vị trí
-        function displayLocation(latitude, longitude) {
-            const locationDiv = document.getElementById('location');
-            locationDiv.innerText = `Vị trí: Lat ${latitude.toFixed(4)}, Lon ${longitude.toFixed(4)}`;
+        // Check if geolocation is supported
+        if (!navigator.geolocation) {
+            statusDiv.textContent = 'Geolocation is not supported by your device.';
+            geoButton.disabled = true;
+            return;
         }
 
-        // Hàm lấy vị trí từ navigator.geolocation
-        function getLocationFromNavigator() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject("Trình duyệt không hỗ trợ geolocation");
-                } else {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const { latitude, longitude } = position.coords;
-                            resolve({ latitude, longitude });
-                        },
-                        (error) => {
-                            reject(`Lỗi lấy vị trí: ${error.message}`);
-                        }
-                    );
+        // Function to check permission status
+        async function checkGeoPermission() {
+            try {
+                const permission = await navigator.permissions.query({ name: 'geolocation' });
+                return permission.state; // 'granted', 'prompt', or 'denied'
+            } catch (e) {
+                console.error('Error checking permission:', e);
+                return 'prompt'; // Fallback to prompt if permission API fails
+            }
+        }
+
+        // Function to start watching live location
+        function startLiveLocation() {
+            // Update button to indicate tracking
+            geoButton.textContent = '📍 Stop Tracking';
+            geoButton.style.backgroundColor = '#cc0000';
+
+            // Watch position for continuous updates
+            const watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+                    statusDiv.textContent = `Live Location: Latitude ${latitude.toFixed(4)}, Longitude ${longitude.toFixed(4)}`;
+
+                    // Optionally send data to Telegram Bot or server
+                    WebApp.sendData(JSON.stringify({
+                        latitude: latitude,
+                        longitude: longitude,
+                        timestamp: new Date().toISOString()
+                    }));
+                },
+                (error) => {
+                    statusDiv.textContent = `Error: ${error.message}`;
+                    stopLiveLocation(watchId);
+                },
+                {
+                    enableHighAccuracy: true, // High accuracy for live tracking
+                    maximumAge: 0,           // No cached positions
+                    timeout: 5000            // Timeout after 5 seconds
+                }
+            );
+
+            // Update button to allow stopping
+            geoButton.onclick = () => stopLiveLocation(watchId);
+        }
+
+        // Function to stop watching live location
+        function stopLiveLocation(watchId) {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            geoButton.textContent = '📍 Allow Geolocation Access';
+            geoButton.style.backgroundColor = '#0088cc';
+            statusDiv.textContent = 'Live tracking stopped. Click to start again.';
+            geoButton.onclick = requestGeoAccess; // Reset button action
+        }
+
+        // Function to request geolocation access
+        async function requestGeoAccess() {
+            const permissionStatus = await checkGeoPermission();
+
+            if (permissionStatus === 'granted') {
+                // Permission already granted, start live tracking
+                startLiveLocation();
+            } else if (permissionStatus === 'denied') {
+                // Permission denied, show alert
+                WebApp.showAlert('Geolocation access is denied. Please enable it in your Telegram or browser settings.');
+                statusDiv.textContent = 'Geolocation access denied.';
+            } else {
+                // Prompt for permission
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        statusDiv.textContent = `Initial Location: Latitude ${latitude.toFixed(4)}, Longitude ${longitude.toFixed(4)}`;
+                        // Save permission status
+                        localStorage.setItem('geoPermission', 'granted');
+                        // Start live tracking
+                        startLiveLocation();
+                    },
+                    (error) => {
+                        statusDiv.textContent = `Error: ${error.message}`;
+                        WebApp.showAlert(`Failed to access location: ${error.message}`);
+                    }
+                );
+            }
+        }
+
+        // Attach event listener to button
+        geoButton.onclick = requestGeoAccess;
+
+        // Check stored permission on page load
+        if (localStorage.getItem('geoPermission') === 'granted') {
+            checkGeoPermission().then((status) => {
+                if (status === 'granted') {
+                    statusDiv.textContent = 'Geolocation permission already granted. Click to start tracking.';
                 }
             });
         }
-
-        // Hàm bắt đầu lấy vị trí mỗi 5 giây
-        function startTracking() {
-            if (intervalId) {
-                clearInterval(intervalId); // Dừng interval cũ nếu có
-            }
-
-            // Lấy vị trí lần đầu ngay lập tức
-            getLocationFromNavigator()
-                .then(({ latitude, longitude }) => {
-                    displayLocation(latitude, longitude);
-                })
-                .catch((error) => {
-                    document.getElementById('location').innerText = `Lỗi: ${error}`;
-                });
-
-            // Lấy vị trí mỗi 5 giây
-            intervalId = setInterval(() => {
-                getLocationFromNavigator()
-                    .then(({ latitude, longitude }) => {
-                        displayLocation(latitude, longitude);
-                    })
-                    .catch((error) => {
-                        document.getElementById('location').innerText = `Lỗi: ${error}`;
-                    });
-            }, 5000); // 5000ms = 5 giây
-
-            // Cập nhật nút
-            const startBtn = document.getElementById('startBtn');
-            startBtn.innerText = "Đang lấy vị trí...";
-            startBtn.disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-        }
-
-        // Hàm dừng lấy vị trí
-        function stopTracking() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-                const startBtn = document.getElementById('startBtn');
-                startBtn.innerText = "Bắt đầu lấy vị trí";
-                startBtn.disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                document.getElementById('location').innerText = "Vị trí: Đã dừng";
-            }
-        }
-
-        // Gắn sự kiện cho nút
-        document.getElementById('startBtn').addEventListener('click', startTracking);
-        document.getElementById('stopBtn').addEventListener('click', stopTracking);
-        document.getElementById('stopBtn').disabled = true; // Ban đầu nút "Dừng" bị vô hiệu hóa
-
-        // Tùy chỉnh giao diện theo theme Telegram
-        tg.expand(); // Mở rộng Mini App fullscreen
-        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
-        document.body.style.color = tg.themeParams.text_color || '#000000';
     </script>
 </body>
 </html>
