@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geolocation in Telegram Mini App</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Theo dõi tọa độ với watchPosition</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,144 +16,86 @@
             margin: 0;
             background-color: #f0f0f0;
         }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #0088cc;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #006b9f;
-        }
-        #status {
-            margin-top: 20px;
-            font-size: 14px;
+
+        #location {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             text-align: center;
+        }
+
+        #error {
+            color: red;
+            display: none;
         }
     </style>
 </head>
+
 <body>
-    <button id="geoButton">📍 Allow Geolocation Access</button>
-    <div id="status">Click the button to share your location.</div>
+    <div id="location">
+        <h2>Tọa độ hiện tại</h2>
+        <p id="coords">Đang lấy vị trí...</p>
+        <p id="error"></p>
+    </div>
 
     <script>
-        // Initialize Telegram WebApp
-        const WebApp = window.Telegram.WebApp;
-        WebApp.ready();
+        // Kiểm tra xem trình duyệt có hỗ trợ Geolocation không
+        if (navigator.geolocation) {
+            // Biến để lưu watchId
+            let watchId;
 
-        // Get DOM elements
-        const geoButton = document.getElementById('geoButton');
-        const statusDiv = document.getElementById('status');
+            // Hàm cập nhật tọa độ
+            const updateLocation = (position) => {
+                const { latitude, longitude, accuracy } = position.coords;
+                const coordsElement = document.getElementById('coords');
+                coordsElement.textContent = `Vĩ độ: ${latitude.toFixed(
+                    6
+                )} | Kinh độ: ${longitude.toFixed(6)} | Độ chính xác: ${accuracy.toFixed(
+                    0
+                )}m`;
+            };
 
-        // Check if geolocation is supported
-        if (!navigator.geolocation) {
-            statusDiv.textContent = 'Geolocation is not supported by your device.';
-            geoButton.disabled = true;
-            return;
-        }
+            // Hàm xử lý lỗi
+            const handleError = (error) => {
+                const errorElement = document.getElementById('error');
+                errorElement.style.display = 'block';
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorElement.textContent = 'Người dùng từ chối cấp quyền truy cập vị trí.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorElement.textContent = 'Không thể xác định vị trí.';
+                        break;
+                    case error.TIMEOUT:
+                        errorElement.textContent = 'Hết thời gian lấy vị trí.';
+                        break;
+                    default:
+                        errorElement.textContent = 'Đã xảy ra lỗi: ' + error.message;
+                }
+            };
 
-        // Function to check permission status
-        async function checkGeoPermission() {
-            try {
-                const permission = await navigator.permissions.query({ name: 'geolocation' });
-                return permission.state; // 'granted', 'prompt', or 'denied'
-            } catch (e) {
-                console.error('Error checking permission:', e);
-                return 'prompt'; // Fallback to prompt if permission API fails
-            }
-        }
-
-        // Function to start watching live location
-        function startLiveLocation() {
-            // Update button to indicate tracking
-            geoButton.textContent = '📍 Stop Tracking';
-            geoButton.style.backgroundColor = '#cc0000';
-
-            // Watch position for continuous updates
-            const watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    const latitude = position.coords.latitude;
-                    const longitude = position.coords.longitude;
-                    statusDiv.textContent = `Live Location: Latitude ${latitude.toFixed(4)}, Longitude ${longitude.toFixed(4)}`;
-
-                    // Optionally send data to Telegram Bot or server
-                    WebApp.sendData(JSON.stringify({
-                        latitude: latitude,
-                        longitude: longitude,
-                        timestamp: new Date().toISOString()
-                    }));
-                },
-                (error) => {
-                    statusDiv.textContent = `Error: ${error.message}`;
-                    stopLiveLocation(watchId);
-                },
+            // Cấu hình watchPosition
+            watchId = navigator.geolocation.watchPosition(
+                updateLocation,
+                handleError,
                 {
-                    enableHighAccuracy: true, // High accuracy for live tracking
-                    maximumAge: 0,           // No cached positions
-                    timeout: 5000            // Timeout after 5 seconds
+                    enableHighAccuracy: true, // Lấy vị trí chính xác hơn
+                    timeout: 1000, // Thời gian chờ tối đa 5 giây
+                    maximumAge: 0, // Không dùng cache
                 }
             );
 
-            // Update button to allow stopping
-            geoButton.onclick = () => stopLiveLocation(watchId);
-        }
-
-        // Function to stop watching live location
-        function stopLiveLocation(watchId) {
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-            }
-            geoButton.textContent = '📍 Allow Geolocation Access';
-            geoButton.style.backgroundColor = '#0088cc';
-            statusDiv.textContent = 'Live tracking stopped. Click to start again.';
-            geoButton.onclick = requestGeoAccess; // Reset button action
-        }
-
-        // Function to request geolocation access
-        async function requestGeoAccess() {
-            const permissionStatus = await checkGeoPermission();
-
-            if (permissionStatus === 'granted') {
-                // Permission already granted, start live tracking
-                startLiveLocation();
-            } else if (permissionStatus === 'denied') {
-                // Permission denied, show alert
-                WebApp.showAlert('Geolocation access is denied. Please enable it in your Telegram or browser settings.');
-                statusDiv.textContent = 'Geolocation access denied.';
-            } else {
-                // Prompt for permission
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const latitude = position.coords.latitude;
-                        const longitude = position.coords.longitude;
-                        statusDiv.textContent = `Initial Location: Latitude ${latitude.toFixed(4)}, Longitude ${longitude.toFixed(4)}`;
-                        // Save permission status
-                        localStorage.setItem('geoPermission', 'granted');
-                        // Start live tracking
-                        startLiveLocation();
-                    },
-                    (error) => {
-                        statusDiv.textContent = `Error: ${error.message}`;
-                        WebApp.showAlert(`Failed to access location: ${error.message}`);
-                    }
-                );
-            }
-        }
-
-        // Attach event listener to button
-        geoButton.onclick = requestGeoAccess;
-
-        // Check stored permission on page load
-        if (localStorage.getItem('geoPermission') === 'granted') {
-            checkGeoPermission().then((status) => {
-                if (status === 'granted') {
-                    statusDiv.textContent = 'Geolocation permission already granted. Click to start tracking.';
-                }
-            });
+            // Để đảm bảo cập nhật liên tục, không cần setInterval vì watchPosition tự động gọi lại khi có thay đổi
+        } else {
+            // Nếu trình duyệt không hỗ trợ Geolocation
+            document.getElementById('coords').textContent =
+                'Trình duyệt không hỗ trợ Geolocation.';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent =
+                'Vui lòng dùng trình duyệt hiện đại hơn.';
         }
     </script>
 </body>
+
 </html>
